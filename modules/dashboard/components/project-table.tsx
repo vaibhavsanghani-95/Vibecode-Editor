@@ -53,6 +53,7 @@ import {
   Eye,
 } from "lucide-react";
 import { toast } from "sonner";
+import { MarkedToggleButton } from "./marked-toggle";
 
 interface ProjectTableProps {
   projects: Project[];
@@ -61,7 +62,7 @@ interface ProjectTableProps {
     data: { title: string; description: string },
   ) => Promise<void>;
   onDeleteProject?: (id: string) => Promise<void>;
-  onDuplicateProject?: (id: string) => Promise<void>;
+  onDuplicateProject?: (id: string) => Promise<unknown>;
   onMarkasFavorite?: (id: string) => Promise<void>;
 }
 
@@ -88,15 +89,32 @@ export default function ProjectTable({
   const [favoutrie, setFavourite] = useState(false);
 
   const handleEditClick = (project: Project) => {
-    //    Write your logic here
+    setSelectedProject(project);
+    setEditData({
+      title: project.title,
+      description: project.description || "",
+    });
+    setEditDialogOpen(true);
   };
 
   const handleDeleteClick = async (project: Project) => {
-    //    Write your logic here
+    setSelectedProject(project);
+    setDeleteDialogOpen(true);
   };
 
   const handleUpdateProject = async () => {
-    //    Write your logic here
+    if (!selectedProject || !onUpdateProject) return;
+    setIsLoading(true);
+    try {
+      await onUpdateProject(selectedProject.id, editData);
+      setEditDialogOpen(false);
+      toast.success("Project updated successfully");
+    } catch (error) {
+      toast.error("Failed to update project");
+      console.log(error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleMarkasFavorite = async (project: Project) => {
@@ -104,15 +122,38 @@ export default function ProjectTable({
   };
 
   const handleDeleteProject = async () => {
-    //    Write your logic here
+    if (!selectedProject || !onDeleteProject) return;
+    setIsLoading(true);
+    try {
+      await onDeleteProject(selectedProject.id);
+      setDeleteDialogOpen(false);
+      setSelectedProject(null);
+      toast.success("Project deleted successfully");
+    } catch (error) {
+      toast.error("Failed to delete project");
+      console.log(error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleDuplicateProject = async (project: Project) => {
-    //    Write your logic here
+    if (!onDuplicateProject) return;
+    setIsLoading(true);
+    try {
+      await onDuplicateProject(project.id);
+      toast.success("Project duplicated successfully");
+    } catch {
+      toast.error("Failed to duplicate the project");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const copyProjectUrl = (projectId: string) => {
-    //    Write your logic here
+    const url = `${window.location.origin}/playground/${projectId}`;
+    navigator.clipboard.writeText(url);
+    toast.success("project url copied to clipboard");
   };
 
   return (
@@ -153,20 +194,22 @@ export default function ProjectTable({
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  {format(new Date(project.createdAt), "MMM d, yyyy")}
+                  <span className="text-sm text-gray-500">
+                    {format(new Date(project.createdAt), "MMM d, yyyy")}
+                  </span>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-full overflow-hidden">
                       <Image
                         src={project.user.image || "/placeholder.svg"}
-                        alt={project.user.name}
+                        alt={project.user.name ?? "User avatar"}
                         width={32}
                         height={32}
                         className="object-cover"
                       />
                     </div>
-                    <span className="text-sm">{project.user.name}</span>
+                    <span className="text-sm">{project.user.name ?? "Unknown user"}</span>
                   </div>
                 </TableCell>
                 <TableCell>
@@ -184,14 +227,20 @@ export default function ProjectTable({
                       <span className="sr-only">Open menu</span>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
-                      {/* <DropdownMenuItem
-                        render={
-                          <MarkedToggleButton
-                            markedForRevision={project.Starmark[0]?.isMarked}
-                            id={project.id}
-                          />
-                        }
-                      /> */}
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          // Keep the menu open so the toggle action can complete
+                        }}
+                      >
+                        <MarkedToggleButton
+                          markedForRevision={project.StarMark[0]?.isMarked ?? false}
+                          id={project.id}
+                          onSelect={() => {
+                            // Keep the menu open so the toggle action can complete
+                          }}
+                          className="w-full justify-start px-0 py-0 h-auto rounded-none bg-transparent hover:bg-transparent"
+                        />
+                      </DropdownMenuItem>
                       <DropdownMenuItem
                         render={
                           <Link

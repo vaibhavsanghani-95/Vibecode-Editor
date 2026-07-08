@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AuthSessionProvider } from "@/components/providers/session-provider";
 import { ThemeProvider } from "next-themes";
+import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -24,7 +25,10 @@ export default async function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            {children}
+            <div className="flex flex-col min-h-screen">
+              <Toaster />
+              <div className="flex-1">{children}</div>
+            </div>
           </ThemeProvider>
         </AuthSessionProvider>
       </body>
