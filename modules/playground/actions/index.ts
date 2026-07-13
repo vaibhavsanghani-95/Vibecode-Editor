@@ -4,12 +4,10 @@ import { db } from "@/lib/db";
 import { TemplateFolder } from "../lib/path-to-json";
 import { currentUser } from "@/modules/auth/actions";
 
-export const getPlayGroundById = async (id: string) => {
+export const getPlaygroundById = async (id: string) => {
   try {
     const playground = await db.playground.findUnique({
-      where: {
-        id,
-      },
+      where: { id },
       select: {
         title: true,
         templateFiles: {

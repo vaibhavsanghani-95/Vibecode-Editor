@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
+
 import type { TemplateFolder } from "../lib/path-to-json";
-import { getPlayGroundById, SaveUpdatedCode } from "../actions";
+import { getPlaygroundById, SaveUpdatedCode } from "../actions";
 
 interface PlaygroundData {
   id: string;
@@ -33,7 +34,7 @@ export const usePlayground = (id: string): UsePlaygroundReturn => {
       setIsLoading(true);
       setError(null);
 
-      const data = await getPlayGroundById(id);
+      const data = await getPlaygroundById(id);
 
       //   @ts-ignore
       setPlaygroundData(data);

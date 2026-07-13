@@ -137,11 +137,11 @@ export function TemplateFileTree({
           <SidebarGroupLabel>{title}</SidebarGroupLabel>
           <DropdownMenu>
             <DropdownMenuTrigger
-              render={
-                <SidebarGroupAction>
+              render={(props) => (
+                <SidebarGroupAction {...props}>
                   <Plus className="h-4 w-4" />
                 </SidebarGroupAction>
-              }
+              )}
             />
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={handleAddRootFile}>
@@ -297,15 +297,16 @@ function TemplateNode({
 
           <DropdownMenu>
             <DropdownMenuTrigger
-              render={
+              render={(props) => (
                 <Button
+                  {...props}
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <MoreHorizontal className="h-3 w-3" />
                 </Button>
-              }
+              )}
             />
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={handleRename}>
@@ -407,26 +408,27 @@ function TemplateNode({
         >
           <div className="flex items-center group">
             <CollapsibleTrigger
-              render={
-                <SidebarMenuButton className="flex-1">
+              render={(props) => (
+                <SidebarMenuButton {...props} className="flex-1">
                   <ChevronRight className="transition-transform" />
                   <Folder className="h-4 w-4 mr-2 shrink-0" />
                   <span>{folderName}</span>
                 </SidebarMenuButton>
-              }
+              )}
             />
 
             <DropdownMenu>
               <DropdownMenuTrigger
-                render={
+                render={(props) => (
                   <Button
+                    {...props}
                     variant="ghost"
                     size="icon"
                     className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <MoreHorizontal className="h-3 w-3" />
                   </Button>
-                }
+                )}
               />
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={handleAddFile}>

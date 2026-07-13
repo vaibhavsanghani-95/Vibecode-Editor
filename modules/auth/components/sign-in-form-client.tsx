@@ -1,7 +1,5 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { FcGoogle } from "react-icons/fc";
-import { FaGithub } from "react-icons/fa";
 import {
   Card,
   CardContent,
@@ -10,6 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { FaGithub, FaChrome } from "react-icons/fa";
 import { signIn } from "@/auth";
 
 async function handleGoogleSignIn() {
@@ -24,33 +23,25 @@ async function handleGithubSignIn() {
 
 const SignInFormClient = () => {
   return (
-    <Card className="w-full max-w-md border border-slate-200 bg-white text-slate-900 shadow-sm">
+    <Card className="w-full max-w-md">
       <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold text-center text-slate-900">
+        <CardTitle className="text-2xl font-bold text-center">
           Sign In
         </CardTitle>
-        <CardDescription className="text-center text-slate-600">
+        <CardDescription className="text-center">
           Choose your preferred sign-in method
         </CardDescription>
       </CardHeader>
 
       <CardContent className="grid gap-4">
         <form action={handleGoogleSignIn}>
-          <Button
-            type="submit"
-            variant={"outline"}
-            className="w-full border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
-          >
-            <FcGoogle className="mr-2 h-4 w-4" />
+          <Button type="submit" variant={"outline"} className="w-full">
+            <FaChrome className="mr-2 h-4 w-4" />
             <span>Sign in with google</span>
           </Button>
         </form>
         <form action={handleGithubSignIn}>
-          <Button
-            type="submit"
-            variant={"outline"}
-            className="w-full border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
-          >
+          <Button type="submit" variant={"outline"} className="w-full">
             <FaGithub className="mr-2 h-4 w-4" />
             <span>Sign in with github</span>
           </Button>
@@ -58,13 +49,13 @@ const SignInFormClient = () => {
       </CardContent>
 
       <CardFooter>
-        <p className="w-full text-center text-sm text-slate-600">
+        <p className="text-sm text-center text-gray-500 dark:text-gray-400 w-full">
           By signing in, you agree to our{" "}
-          <a href="#" className="underline hover:text-slate-900">
+          <a href="#" className="underline hover:text-primary">
             Terms of Service
           </a>{" "}
           and{" "}
-          <a href="#" className="underline hover:text-slate-900">
+          <a href="#" className="underline hover:text-primary">
             Privacy Policy
           </a>
           .
