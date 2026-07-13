@@ -12,6 +12,11 @@ interface OpenFile extends TemplateFile {
   originalContent: string;
 }
 
+const getFileName = (file: Pick<TemplateFile, "filename" | "fileExtension">) =>
+  file.fileExtension ? `${file.filename}.${file.fileExtension}` : file.filename;
+
+const joinPath = (...parts: string[]) => parts.filter(Boolean).join("/");
+
 interface FileExplorerState {
   playgroundId: string;
   templateData: TemplateFolder | null;
@@ -361,14 +366,14 @@ export const useFileExplorer = create<FileExplorerState>((set, get) => ({
     const { templateData, openFiles, activeFileId } = get();
     if (!templateData) return;
 
-    // Generate old and new file IDs using the same logic as openFile
     const oldFileId = generateFileId(file, templateData);
+    const oldFilePath = joinPath(parentPath, getFileName(file));
     const newFile = {
       ...file,
       filename: newFilename,
       fileExtension: newExtension,
     };
-    const newFileId = generateFileId(newFile, templateData);
+    const newFileId = joinPath(parentPath, getFileName(newFile));
 
     try {
       const updatedTemplateData = JSON.parse(
@@ -403,7 +408,7 @@ export const useFileExplorer = create<FileExplorerState>((set, get) => ({
 
         // Update open files with new ID and names
         const updatedOpenFiles = openFiles.map((f) =>
-          f.id === oldFileId
+          f.id === oldFileId || f.id === oldFilePath
             ? {
                 ...f,
                 id: newFileId,
@@ -422,10 +427,15 @@ export const useFileExplorer = create<FileExplorerState>((set, get) => ({
         // Use the passed saveTemplateData function
         await saveTemplateData(updatedTemplateData);
         toast.success(`Renamed file to: ${newFilename}.${newExtension}`);
+      } else {
+        throw new Error(
+          `File not found: ${file.filename}.${file.fileExtension}`,
+        );
       }
     } catch (error) {
       console.error("Error renaming file:", error);
       toast.error("Failed to rename file");
+      throw error;
     }
   },
 
@@ -435,8 +445,11 @@ export const useFileExplorer = create<FileExplorerState>((set, get) => ({
     parentPath,
     saveTemplateData,
   ) => {
-    const { templateData } = get();
+    const { templateData, openFiles, activeFileId } = get();
     if (!templateData) return;
+
+    const oldFolderPath = joinPath(parentPath, folder.folderName);
+    const newFolderPath = joinPath(parentPath, newFolderName);
 
     try {
       const updatedTemplateData = JSON.parse(
@@ -465,15 +478,38 @@ export const useFileExplorer = create<FileExplorerState>((set, get) => ({
         } as TemplateFolder;
         currentFolder.items[folderIndex] = updatedFolder;
 
-        set({ templateData: updatedTemplateData });
+        const updatedOpenFiles = openFiles.map((file) =>
+          file.id === oldFolderPath || file.id.startsWith(`${oldFolderPath}/`)
+            ? {
+                ...file,
+                id: `${newFolderPath}${file.id.slice(oldFolderPath.length)}`,
+              }
+            : file,
+        );
+
+        const nextActiveFileId =
+          activeFileId &&
+          (activeFileId === oldFolderPath ||
+            activeFileId.startsWith(`${oldFolderPath}/`))
+            ? `${newFolderPath}${activeFileId.slice(oldFolderPath.length)}`
+            : activeFileId;
+
+        set({
+          templateData: updatedTemplateData,
+          openFiles: updatedOpenFiles,
+          activeFileId: nextActiveFileId,
+        });
 
         // Use the passed saveTemplateData function
         await saveTemplateData(updatedTemplateData);
         toast.success(`Renamed folder to: ${newFolderName}`);
+      } else {
+        throw new Error(`Folder not found: ${folder.folderName}`);
       }
     } catch (error) {
       console.error("Error renaming folder:", error);
       toast.error("Failed to rename folder");
+      throw error;
     }
   },
 

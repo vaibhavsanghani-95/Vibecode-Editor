@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useCallback, useEffect, useState, useRef } from "react";
 
 import { transformToWebContainerFormat } from "../hooks/transformer";
 import { CheckCircle, Loader2, XCircle } from "lucide-react";
@@ -7,7 +7,11 @@ import { Progress } from "@/components/ui/progress";
 
 import { WebContainer } from "@webcontainer/api";
 import { TemplateFolder } from "@/modules/playground/lib/path-to-json";
-import TerminalComponent from "./terminal";
+import dynamic from "next/dynamic";
+
+const TerminalComponent = dynamic(() => import("./terminal"), {
+  ssr: false,
+});
 
 interface WebContainerPreviewProps {
   templateData: TemplateFolder;
@@ -17,6 +21,9 @@ interface WebContainerPreviewProps {
   instance: WebContainer | null;
   writeFileSync: (path: string, content: string) => Promise<void>;
   forceResetup?: boolean; // Optional prop to force re-setup
+  onPreviewReady?: (url: string) => void;
+  refreshKey?: number;
+  terminalMessage?: { id: number; text: string } | null;
 }
 const WebContainerPreview = ({
   templateData,
@@ -26,6 +33,9 @@ const WebContainerPreview = ({
   serverUrl,
   writeFileSync,
   forceResetup = false,
+  onPreviewReady,
+  refreshKey = 0,
+  terminalMessage = null,
 }: WebContainerPreviewProps) => {
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [loadingState, setLoadingState] = useState({
@@ -42,6 +52,33 @@ const WebContainerPreview = ({
   const [isSetupInProgress, setIsSetupInProgress] = useState(false);
 
   const terminalRef = useRef<any>(null);
+
+  const getStartupScript = useCallback(async () => {
+    if (!instance) return "start";
+
+    try {
+      const packageJson = await instance.fs.readFile("package.json", "utf8");
+      const parsedPackageJson = JSON.parse(packageJson) as {
+        scripts?: Record<string, string>;
+      };
+
+      return parsedPackageJson.scripts?.dev ? "dev" : "start";
+    } catch {
+      return "start";
+    }
+  }, [instance]);
+
+  const iframeSrc = refreshKey
+    ? `${previewUrl}${previewUrl.includes("?") ? "&" : "?"}previewReload=${refreshKey}`
+    : previewUrl;
+
+  useEffect(() => {
+    if (!terminalMessage) return;
+
+    window.setTimeout(() => {
+      terminalRef.current?.writeToTerminal(terminalMessage.text);
+    }, 0);
+  }, [terminalMessage]);
 
   // Reset setup state when forceResetup changes
   useEffect(() => {
@@ -90,6 +127,7 @@ const WebContainerPreview = ({
               }
 
               setPreviewUrl(url);
+              onPreviewReady?.(url);
               setLoadingState((prev) => ({
                 ...prev,
                 starting: false,
@@ -192,7 +230,11 @@ const WebContainerPreview = ({
           );
         }
 
-        const startProcess = await instance.spawn("npm", ["run", "start"]);
+        const startupScript = await getStartupScript();
+        const startProcess = await instance.spawn("npm", [
+          "run",
+          startupScript,
+        ]);
 
         instance.on("server-ready", (port: number, url: string) => {
           if (terminalRef.current?.writeToTerminal) {
@@ -201,6 +243,7 @@ const WebContainerPreview = ({
             );
           }
           setPreviewUrl(url);
+          onPreviewReady?.(url);
           setLoadingState((prev) => ({
             ...prev,
             starting: false,
@@ -239,7 +282,14 @@ const WebContainerPreview = ({
     }
 
     setupContainer();
-  }, [instance, templateData, isSetupComplete, isSetupInProgress]);
+  }, [
+    instance,
+    templateData,
+    isSetupComplete,
+    isSetupInProgress,
+    getStartupScript,
+    onPreviewReady,
+  ]);
 
   useEffect(() => {
     return () => {};
@@ -345,7 +395,7 @@ const WebContainerPreview = ({
         <div className="h-full flex flex-col">
           <div className="flex-1">
             <iframe
-              src={previewUrl}
+              src={iframeSrc}
               className="w-full h-full border-none"
               title="WebContainer Preview"
             />

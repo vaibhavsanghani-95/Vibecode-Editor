@@ -41,9 +41,6 @@ export const generateFileId = (
   const extension = file.fileExtension?.trim();
   const extensionSuffix = extension ? `.${extension}` : "";
 
-  // Combine path and filename
-  return path
-    ? `${path}/${file.filename}${extensionSuffix}`
-    : `${file.filename}${extensionSuffix}`;
+  return path || `${file.filename}${extensionSuffix}`;
 };
 

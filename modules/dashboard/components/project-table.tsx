@@ -42,6 +42,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   MoreHorizontal,
@@ -78,6 +79,7 @@ export default function ProjectTable({
   onDuplicateProject,
   onMarkasFavorite,
 }: ProjectTableProps) {
+  const router = useRouter();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -125,7 +127,15 @@ export default function ProjectTable({
     if (!selectedProject || !onDeleteProject) return;
     setIsLoading(true);
     try {
-      await onDeleteProject(selectedProject.id);
+      const deletedProjectId = selectedProject.id;
+
+      await onDeleteProject(deletedProjectId);
+      window.dispatchEvent(
+        new CustomEvent("dashboard:project-deleted", {
+          detail: { id: deletedProjectId },
+        }),
+      );
+      router.refresh();
       setDeleteDialogOpen(false);
       setSelectedProject(null);
       toast.success("Project deleted successfully");

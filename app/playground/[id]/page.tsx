@@ -24,20 +24,18 @@ import {
 import LoadingStep from "@/modules/playground/components/loader";
 import { PlaygroundEditor } from "@/modules/playground/components/playground-editor";
 import { TemplateFileTree } from "@/modules/playground/components/playground-explorer";
-import ToggleAI from "@/modules/playground/components/toggle-ai";
-import { useAISuggestions } from "@/modules/playground/hooks/useAISuggestion";
 import { useFileExplorer } from "@/modules/playground/hooks/usefileExplorer";
 import { usePlayground } from "@/modules/playground/hooks/usePlayground";
 import { findFilePath } from "@/modules/playground/lib";
 import {
   TemplateFile,
   TemplateFolder,
+  TemplateItem,
 } from "@/modules/playground/lib/path-to-json";
 import WebContainerPreview from "@/modules/webcontainers/components/webcontainer-preview";
 import { useWebContainer } from "@/modules/webcontainers/hooks/useWebContainer";
 import {
   AlertCircle,
-  Bot,
   FileText,
   FolderOpen,
   Save,
@@ -45,23 +43,21 @@ import {
   X,
 } from "lucide-react";
 import { useParams } from "next/navigation";
-import React, {
-  useCallback,
-  useEffect,
-  useReducer,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 const MainPlaygroundPage = () => {
   const { id } = useParams<{ id: string }>();
   const [isPreviewVisible, setIsPreviewVisible] = useState(true);
+  const [isWebContainerReady, setIsWebContainerReady] = useState(false);
+  const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
+  const [terminalMessage, setTerminalMessage] = useState<{
+    id: number;
+    text: string;
+  } | null>(null);
 
   const { playgroundData, templateData, isLoading, error, saveTemplateData } =
     usePlayground(id);
-
-  const aiSuggestions = useAISuggestions();
 
   const {
     setTemplateData,
@@ -89,10 +85,26 @@ const MainPlaygroundPage = () => {
     error: containerError,
     instance,
     writeFileSync,
-    // @ts-ignore
   } = useWebContainer({ templateData });
 
   const lastSyncedContent = useRef<Map<string, string>>(new Map());
+
+  const writePreviewTerminal = useCallback((message: string) => {
+    setTerminalMessage({
+      id: Date.now(),
+      text: message.endsWith("\r\n") ? message : `${message}\r\n`,
+    });
+  }, []);
+
+  const getFileName = useCallback((file: TemplateFile) => {
+    return file.fileExtension
+      ? `${file.filename}.${file.fileExtension}`
+      : file.filename;
+  }, []);
+
+  const joinPath = useCallback((...parts: string[]) => {
+    return parts.filter(Boolean).join("/");
+  }, []);
 
   useEffect(() => {
     setPlaygroundId(id);
@@ -140,33 +152,99 @@ const MainPlaygroundPage = () => {
   );
 
   const wrappedHandleRenameFile = useCallback(
-    (
+    async (
       file: TemplateFile,
       newFilename: string,
       newExtension: string,
       parentPath: string,
     ) => {
-      return handleRenameFile(
-        file,
-        newFilename,
-        newExtension,
+      const oldPath = joinPath(parentPath, getFileName(file));
+      const newPath = joinPath(
         parentPath,
-        saveTemplateData,
+        getFileName({
+          ...file,
+          filename: newFilename,
+          fileExtension: newExtension,
+        }),
       );
+
+      try {
+        await handleRenameFile(
+          file,
+          newFilename,
+          newExtension,
+          parentPath,
+          saveTemplateData,
+        );
+
+        if (instance?.fs && oldPath !== newPath) {
+          try {
+            await instance.fs.rename(oldPath, newPath);
+            setPreviewRefreshKey(Date.now());
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : String(error);
+            writePreviewTerminal(
+              `Preview rename error: could not rename "${oldPath}" to "${newPath}". ${message}`,
+            );
+          }
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        writePreviewTerminal(
+          `Preview rename error: file rename did not complete. ${message}`,
+        );
+      }
     },
-    [handleRenameFile, saveTemplateData],
+    [
+      getFileName,
+      handleRenameFile,
+      instance,
+      joinPath,
+      saveTemplateData,
+      writePreviewTerminal,
+    ],
   );
 
   const wrappedHandleRenameFolder = useCallback(
-    (folder: TemplateFolder, newFolderName: string, parentPath: string) => {
-      return handleRenameFolder(
-        folder,
-        newFolderName,
-        parentPath,
-        saveTemplateData,
-      );
+    async (folder: TemplateFolder, newFolderName: string, parentPath: string) => {
+      const oldPath = joinPath(parentPath, folder.folderName);
+      const newPath = joinPath(parentPath, newFolderName);
+
+      try {
+        await handleRenameFolder(
+          folder,
+          newFolderName,
+          parentPath,
+          saveTemplateData,
+        );
+
+        if (instance?.fs && oldPath !== newPath) {
+          try {
+            await instance.fs.rename(oldPath, newPath);
+            setPreviewRefreshKey(Date.now());
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : String(error);
+            writePreviewTerminal(
+              `Preview rename error: could not rename folder "${oldPath}" to "${newPath}". ${message}`,
+            );
+          }
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        writePreviewTerminal(
+          `Preview rename error: folder rename did not complete. ${message}`,
+        );
+      }
     },
-    [handleRenameFolder, saveTemplateData],
+    [
+      handleRenameFolder,
+      instance,
+      joinPath,
+      saveTemplateData,
+      writePreviewTerminal,
+    ],
   );
 
   const activeFile = openFiles.find((file) => file.id === activeFileId);
@@ -175,6 +253,34 @@ const MainPlaygroundPage = () => {
   const handleFileSelect = (file: TemplateFile) => {
     openFile(file);
   };
+
+  useEffect(() => {
+    if (!isWebContainerReady || !activeFile || !writeFileSync) return;
+
+    const latestTemplateData = useFileExplorer.getState().templateData;
+    if (!latestTemplateData) return;
+
+    const filePath = findFilePath(activeFile, latestTemplateData);
+    if (!filePath) return;
+
+    const content = activeFile.content || "";
+    if (lastSyncedContent.current.get(activeFile.id) === content) return;
+
+    const timeoutId = window.setTimeout(() => {
+      writeFileSync(filePath, content)
+        .then(() => {
+          lastSyncedContent.current.set(activeFile.id, content);
+          setPreviewRefreshKey(Date.now());
+        })
+        .catch((error) => {
+          console.error("Failed to sync file to WebContainer:", error);
+          const message = error instanceof Error ? error.message : String(error);
+          writePreviewTerminal(`Preview sync error: ${message}`);
+        });
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [activeFile, isWebContainerReady, writeFileSync, writePreviewTerminal]);
 
   const handleSave = useCallback(
     async (fileId?: string) => {
@@ -199,18 +305,32 @@ const MainPlaygroundPage = () => {
 
         const updatedTemplateData = JSON.parse(
           JSON.stringify(latestTemplateData),
-        );
+        ) as TemplateFolder;
 
-        // @ts-ignore
-        const updateFileContent = (items: any[]) =>
-          // @ts-ignore
+        const updateFileContent = (
+          items: TemplateItem[],
+          parentPath = "",
+        ): TemplateItem[] =>
           items.map((item) => {
             if ("folderName" in item) {
-              return { ...item, items: updateFileContent(item.items) };
-            } else if (
-              item.filename === fileToSave.filename &&
-              item.fileExtension === fileToSave.fileExtension
-            ) {
+              const nextPath = parentPath
+                ? `${parentPath}/${item.folderName}`
+                : item.folderName;
+
+              return {
+                ...item,
+                items: updateFileContent(item.items, nextPath),
+              };
+            }
+
+            const extension = item.fileExtension
+              ? `.${item.fileExtension}`
+              : "";
+            const itemPath = parentPath
+              ? `${parentPath}/${item.filename}${extension}`
+              : `${item.filename}${extension}`;
+
+            if (itemPath === filePath) {
               return { ...item, content: fileToSave.content };
             }
             return item;
@@ -228,9 +348,8 @@ const MainPlaygroundPage = () => {
           }
         }
 
-        const newTemplateData = await saveTemplateData(updatedTemplateData);
-        //@ts-ignore
-        setTemplateData(newTemplateData || updatedTemplateData);
+        await saveTemplateData(updatedTemplateData);
+        setTemplateData(updatedTemplateData);
         // Update open files
         const updatedOpenFiles = openFiles.map((f) =>
           f.id === targetFileId
@@ -277,7 +396,7 @@ const MainPlaygroundPage = () => {
     try {
       await Promise.all(unsavedFiles.map((f) => handleSave(f.id)));
       toast.success(`Saved ${unsavedFiles.length} file(s)`);
-    } catch (error) {
+    } catch {
       toast.error("Failed to save some files");
     }
   };
@@ -382,16 +501,18 @@ const MainPlaygroundPage = () => {
 
               <div className="flex items-center gap-1">
                 <Tooltip>
-                  <TooltipTrigger>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleSave()}
-                      disabled={!activeFile || !activeFile.hasUnsavedChanges}
-                    >
-                      <Save className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleSave()}
+                        disabled={!activeFile || !activeFile.hasUnsavedChanges}
+                      >
+                        <Save className="h-4 w-4" />
+                      </Button>
+                    }
+                  />
                   <TooltipContent>Save (Ctrl+S)</TooltipContent>
                 </Tooltip>
 
@@ -411,12 +532,6 @@ const MainPlaygroundPage = () => {
                   />
                   <TooltipContent>Save All (Ctrl+Shift+S)</TooltipContent>
                 </Tooltip>
-
-                <ToggleAI
-                  isEnabled={aiSuggestions.isEnabled}
-                  onToggle={aiSuggestions.toggleEnabled}
-                  suggestionLoading={aiSuggestions.isLoading}
-                />
 
                 <DropdownMenu>
                   <DropdownMenuTrigger
@@ -505,18 +620,6 @@ const MainPlaygroundPage = () => {
                         onContentChange={(value) =>
                           activeFileId && updateFileContent(activeFileId, value)
                         }
-                        suggestion={aiSuggestions.suggestion}
-                        suggestionLoading={aiSuggestions.isLoading}
-                        suggestionPosition={aiSuggestions.position}
-                        onAcceptSuggestion={(editor, monaco) =>
-                          aiSuggestions.acceptSuggestion(editor, monaco)
-                        }
-                        onRejectSuggestion={(editor) =>
-                          aiSuggestions.rejectSuggestion(editor)
-                        }
-                        onTriggerSuggestion={(type, editor) =>
-                          aiSuggestions.fetchSuggestion(type, editor)
-                        }
                       />
                     </ResizablePanel>
 
@@ -532,6 +635,9 @@ const MainPlaygroundPage = () => {
                             error={containerError}
                             serverUrl={serverUrl!}
                             forceResetup={false}
+                            onPreviewReady={() => setIsWebContainerReady(true)}
+                            refreshKey={previewRefreshKey}
+                            terminalMessage={terminalMessage}
                           />
                         </ResizablePanel>
                       </>

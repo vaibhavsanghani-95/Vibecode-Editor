@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -61,12 +61,38 @@ export function DashboardSidebar({
   initialPlaygroundData: PlaygroundData[];
 }) {
   const pathname = usePathname();
-  const [starredPlaygrounds, setStarredPlaygrounds] = useState(
-    initialPlaygroundData.filter((p) => p.starred),
+  const [deletedProjectIds, setDeletedProjectIds] = useState<Set<string>>(
+    () => new Set(),
   );
-  const [recentPlaygrounds, setRecentPlaygrounds] = useState(
-    initialPlaygroundData,
+
+  const recentPlaygrounds = initialPlaygroundData.filter(
+    (playground) => !deletedProjectIds.has(playground.id),
   );
+  const starredPlaygrounds = recentPlaygrounds.filter(
+    (playground) => playground.starred,
+  );
+
+  useEffect(() => {
+    const handleProjectDeleted = (event: Event) => {
+      const projectId = (event as CustomEvent<{ id: string }>).detail?.id;
+      if (!projectId) return;
+
+      setDeletedProjectIds((ids) => {
+        const nextIds = new Set(ids);
+        nextIds.add(projectId);
+        return nextIds;
+      });
+    };
+
+    window.addEventListener("dashboard:project-deleted", handleProjectDeleted);
+
+    return () => {
+      window.removeEventListener(
+        "dashboard:project-deleted",
+        handleProjectDeleted,
+      );
+    };
+  }, []);
 
   return (
     <Sidebar variant="inset" collapsible="icon" className="border border-r">
