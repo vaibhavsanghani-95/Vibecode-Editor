@@ -13,21 +13,21 @@ interface PlaygroundEditorProps {
   activeFile: TemplateFile | undefined;
   content: string;
   onContentChange: (value: string) => void;
-  suggestion: string | null;
-  suggestionLoading: boolean;
-  suggestionPosition: { line: number; column: number } | null;
-  onAcceptSuggestion: (editor: any, monaco: any) => void;
-  onRejectSuggestion: (editor: any) => void;
-  onTriggerSuggestion: (type: string, editor: any) => void;
+  suggestion?: string | null;
+  suggestionLoading?: boolean;
+  suggestionPosition?: { line: number; column: number } | null;
+  onAcceptSuggestion?: (editor: any, monaco: any) => void;
+  onRejectSuggestion?: (editor: any) => void;
+  onTriggerSuggestion?: (type: string, editor: any) => void;
 }
 
 export const PlaygroundEditor = ({
   activeFile,
   content,
   onContentChange,
-  suggestion,
-  suggestionLoading,
-  suggestionPosition,
+  suggestion = null,
+  suggestionLoading = false,
+  suggestionPosition = null,
   onAcceptSuggestion,
   onRejectSuggestion,
   onTriggerSuggestion,
@@ -43,7 +43,7 @@ export const PlaygroundEditor = ({
   const isAcceptingSuggestionRef = useRef(false);
   const suggestionAcceptedRef = useRef(false);
   const suggestionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const tabCommandRef = useRef<any>(null);
+  const tabCommandRef = useRef<string | null>(null);
 
   // Generate unique ID for each suggestion
   const generateSuggestionId = () =>
@@ -254,8 +254,7 @@ export const PlaygroundEditor = ({
       // Clear the suggestion
       clearCurrentSuggestion();
 
-      // Call the parent's accept handler
-      onAcceptSuggestion(editor, monaco);
+      onAcceptSuggestion?.(editor, monaco);
 
       return true;
     } catch (error) {
@@ -386,14 +385,10 @@ export const PlaygroundEditor = ({
     // Keyboard shortcuts
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Space, () => {
       console.log("Ctrl+Space pressed, triggering suggestion");
-      onTriggerSuggestion("completion", editor);
+      onTriggerSuggestion?.("completion", editor);
     });
 
     // CRITICAL: Override Tab key with high priority and prevent default Monaco behavior
-    if (tabCommandRef.current) {
-      tabCommandRef.current.dispose();
-    }
-
     tabCommandRef.current = editor.addCommand(
       monaco.KeyCode.Tab,
       () => {
@@ -448,7 +443,7 @@ export const PlaygroundEditor = ({
     editor.addCommand(monaco.KeyCode.Escape, () => {
       console.log("Escape pressed");
       if (currentSuggestionRef.current) {
-        onRejectSuggestion(editor);
+        onRejectSuggestion?.(editor);
         clearCurrentSuggestion();
       }
     });
@@ -471,12 +466,16 @@ export const PlaygroundEditor = ({
         ) {
           console.log("Cursor moved away from suggestion, clearing");
           clearCurrentSuggestion();
-          onRejectSuggestion(editor);
+          onRejectSuggestion?.(editor);
         }
       }
 
       // Trigger new suggestion if appropriate (simplified)
-      if (!currentSuggestionRef.current && !suggestionLoading) {
+      if (
+        onTriggerSuggestion &&
+        !currentSuggestionRef.current &&
+        !suggestionLoading
+      ) {
         // Clear any existing timeout
         if (suggestionTimeoutRef.current) {
           clearTimeout(suggestionTimeoutRef.current);
@@ -536,7 +535,7 @@ export const PlaygroundEditor = ({
               !currentSuggestionRef.current &&
               !suggestionLoading
             ) {
-              onTriggerSuggestion("completion", editor);
+              onTriggerSuggestion?.("completion", editor);
             }
           }, 100); // Small delay to let the change settle
         }
@@ -573,10 +572,7 @@ export const PlaygroundEditor = ({
         inlineCompletionProviderRef.current.dispose();
         inlineCompletionProviderRef.current = null;
       }
-      if (tabCommandRef.current) {
-        tabCommandRef.current.dispose();
-        tabCommandRef.current = null;
-      }
+      tabCommandRef.current = null;
     };
   }, []);
 

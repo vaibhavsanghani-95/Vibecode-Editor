@@ -3,7 +3,7 @@ import { WebContainer } from "@webcontainer/api";
 import { TemplateFolder } from "@/modules/playground/lib/path-to-json";
 
 interface UseWebContainerProps {
-  templateData: TemplateFolder;
+  templateData: TemplateFolder | null;
 }
 
 interface UseWebContaierReturn {
@@ -15,9 +15,7 @@ interface UseWebContaierReturn {
   destory: () => void;
 }
 
-export const useWebContainer = ({
-  templateData,
-}: UseWebContainerProps): UseWebContaierReturn => {
+export const useWebContainer = ({}: UseWebContainerProps): UseWebContaierReturn => {
   const [serverUrl, setServerUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,12 +23,17 @@ export const useWebContainer = ({
 
   useEffect(() => {
     let mounted = true;
+    let bootedInstance: WebContainer | null = null;
 
     async function initializeWebContainer() {
       try {
         const webcontainerInstance = await WebContainer.boot();
+        bootedInstance = webcontainerInstance;
 
-        if (!mounted) return;
+        if (!mounted) {
+          webcontainerInstance.teardown();
+          return;
+        }
 
         setInstance(webcontainerInstance);
         setIsLoading(false);
@@ -51,9 +54,7 @@ export const useWebContainer = ({
 
     return () => {
       mounted = false;
-      if (instance) {
-        instance.teardown();
-      }
+      bootedInstance?.teardown();
     };
   }, []);
 

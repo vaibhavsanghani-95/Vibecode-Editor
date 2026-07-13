@@ -52,7 +52,7 @@ export const getAllPlaygroundForUser = async () => {
       },
       include: {
         user: true,
-        Starmark: {
+        StarMark: {
           where: {
             userId: user?.id!,
           },
