@@ -20,9 +20,9 @@ const UserButton = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger>
-        <div className={cn("relative rounded-full cursor-pointer")}>
+        <div className={cn("relative rounded-full")}>
           <Avatar>
-            <AvatarImage src={user?.image ?? ""} alt={user?.name ?? "User"} />
+            <AvatarImage src={user?.image!} alt={user?.name!} />
             <AvatarFallback className="bg-red-500">
               <User className="text-white" />
             </AvatarFallback>
@@ -30,13 +30,13 @@ const UserButton = () => {
         </div>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent className="mr-4 w-auto min-w-max">
+      <DropdownMenuContent className="mr-4">
         <DropdownMenuItem>
-          <span className="whitespace-nowrap cursor-pointer">{user?.email}</span>
+          <span>{user?.email}</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <LogoutButton>
-          <DropdownMenuItem className='cursor-pointer'>
+          <DropdownMenuItem>
             <LogOut className="h-4 w-4 mr-2" />
             LogOut
           </DropdownMenuItem>

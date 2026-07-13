@@ -283,3 +283,25 @@ export async function readTemplateStructureFromJson(
     );
   }
 }
+
+/**
+ * Example usage:
+ *
+ * // Basic usage with default options
+ * const templateStructure = await scanTemplateDirectory('./templates/react-app');
+ *
+ * // With custom options
+ * const customOptions = {
+ *   ignoreFiles: ['README.md', 'CHANGELOG.md'],
+ *   ignoreFolders: ['docs', 'examples'],
+ *   maxFileSize: 500 * 1024 // 500KB
+ * };
+ * const templateStructure = await scanTemplateDirectory('./templates/react-app', customOptions);
+ *
+ * // Saving directly to a JSON file with custom options
+ * await saveTemplateStructureToJson(
+ *   './templates/react-app',
+ *   './output/react-app-template.json',
+ *   customOptions
+ * );
+ */
